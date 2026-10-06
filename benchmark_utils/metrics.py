@@ -175,7 +175,6 @@ def mase(
 
 
 def _masked_mean(values: np.ndarray, valid_mask) -> float:
-    """Mean over the valid points only when ``valid_mask`` is given."""
     if valid_mask is None:
         return float(np.mean(values))
     return float(np.mean(values[valid_mask]))

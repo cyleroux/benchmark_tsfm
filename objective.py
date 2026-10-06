@@ -55,6 +55,7 @@ from benchmark_utils.metrics import (  # noqa: F401  (re-exported)
     ALL_METRICS,
     HIGHER_IS_BETTER,
     is_higher_better,
+    windows_valid_mask,
 )
 
 
@@ -189,8 +190,6 @@ class Objective(BaseObjective):
         nan_masks = self.meta.get("nan_mask")
         valid_mask = None
         if nan_masks:
-            from benchmark_utils.metrics import windows_valid_mask
-
             valid_mask = windows_valid_mask(
                 nan_masks, self.cutoff_indexes, y_true.shape
             )

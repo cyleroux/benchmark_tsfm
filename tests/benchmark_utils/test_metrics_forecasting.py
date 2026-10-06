@@ -61,7 +61,6 @@ def test_mase_per_window_matches_gluonts_aggregation():
     # scales: s0 = (2, 20); s1 = (4, NaN) -> s1 ch1 points dropped
     y_true = np.array([[[6.0, 60.0], [7.0, 70.0]], [[10.0, 1.0], [12.0, 3.0]]])
     forecast = _point_forecast(np.zeros_like(y_true))
-    # scales: s0 = (2, 20); s1 = (4, NaN) -> s1 ch1 points dropped
     value = mase(
         y_true,
         forecast,
