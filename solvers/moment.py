@@ -70,9 +70,16 @@ class Solver(BaseTSFMSolver):
 
     def forecast_batch(self, inputs, covariates, prediction_length):
         device = next(self.model.parameters()).device
+        # momentfm's PositionalEmbedding has a fixed 5000-patch buffer:
+        # series with more patches crash the encoder. Keep the last
+        # 1024 patches (MOMENT-1 pretrains on 512-step windows, so
+        # longer context is extrapolation anyway).
+        max_context = 1024 * self.model.patch_len
         results = []
         for inp in inputs:
             # inp: (T, C) — Moment expects (1, C, T)
+            if inp.shape[0] > max_context:
+                inp = inp[-max_context:]
             x_enc = inp.float().T.unsqueeze(0).to(device)  # (1, C, T)
             input_mask = torch.ones(1, inp.shape[0], dtype=torch.float32, device=device)
 
