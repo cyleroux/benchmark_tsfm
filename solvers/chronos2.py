@@ -21,9 +21,11 @@ References
 import numpy as np
 import torch
 from chronos.chronos2 import Chronos2Pipeline
+from einops import rearrange
 
 from benchmark_utils.adapters import POOLERS
 from benchmark_utils.base_solver import BaseTSFMSolver
+from benchmark_utils.forecasting_constants import CANONICAL_QUANTILE_LEVELS
 
 
 class Solver(BaseTSFMSolver):
@@ -39,7 +41,7 @@ class Solver(BaseTSFMSolver):
 
     name = "Chronos2"
 
-    requirements = ["pip::chronos-forecasting>=2.2,<3"]
+    requirements = ["pip::chronos-forecasting>=2.2,<3", "pip::einops"]
 
     parameters = {
         "model_size": ["small"],
@@ -71,31 +73,25 @@ class Solver(BaseTSFMSolver):
 
     @property
     def quantile_levels(self):
-        # Canonical 9 levels (GIFT-Eval evaluator convention, same tuple
-        # the Chronos t5 solver reports); predict_quantiles slices the
-        # native grid to the requested levels (no interpolation), so
-        # WQL/pinball/CRPS/MCIS are scored on the same fan as the leaderboard.
-        return (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
+        # predict_quantiles slices the native grid, no interpolation.
+        return CANONICAL_QUANTILE_LEVELS
 
     def forecast_batch(self, inputs, covariates, prediction_length):
-        # inputs: list of (T, C) tensors — Chronos-2 expects (C, T)
+        # inputs: list of (T, C) tensors; Chronos-2 expects (C, T)
         chrono_inputs = [inp.T for inp in inputs]
         with torch.no_grad():
-            # predict_quantiles slices the native fan to the requested
-            # levels (0.1..0.9 are in the trained grid, no interpolation).
             output, _ = self.model.predict_quantiles(
                 chrono_inputs,
                 prediction_length=prediction_length,
                 quantile_levels=list(self.quantile_levels),
             )
-        # Convert (C, H, Q) → (H, C, Q) for base class assembly
-        return [pred.permute(1, 0, 2) for pred in output]
+        return [rearrange(pred, "c h q -> h c q") for pred in output]
 
     def embed_batch(self, inputs):
         pooler = POOLERS[self.pooler]()
         results = []
         for inp in inputs:
-            context = inp.T.unsqueeze(0)  # (1, C, T) — Chronos-2 input format
+            context = inp.T.unsqueeze(0)  # (1, C, T), Chronos-2 input format
             with torch.no_grad():
                 embeddings, _ = self.model.embed(context)  # list[(C, T_tok, D)]
             emb_np = torch.stack(list(embeddings))[0].float().cpu().numpy()
